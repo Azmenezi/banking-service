@@ -1,6 +1,8 @@
 package com.example.banking_service.account
 
+import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.server.ResponseStatusException
 import java.math.BigDecimal
 
 @RestController
@@ -10,6 +12,14 @@ class AccountController(
 
     @PostMapping("/accounts/v1/accounts")
     fun createAccount(@RequestBody request: AccountRequest): AccountEntity {
+        if (request.accountNumber.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Account number must not be empty")
+        }
+
+        if (request.initialBalance < BigDecimal.ZERO) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Initial balance must not be negative")
+        }
+
         val newAccount = AccountEntity(
             userId = request.userId,
             balance = request.initialBalance,
@@ -20,12 +30,11 @@ class AccountController(
     }
 
     @PostMapping("/accounts/v1/accounts/{accountNumber}/close")
-    fun closeAccount(@PathVariable accountNumber: String) {
-        val account = accountRepo.findAll().firstOrNull { it.accountNumber == accountNumber }
-            ?: throw RuntimeException("Account not found")
-
-        // Update isActive to false
-        accountRepo.save(account.copy(isActive = false))
+    fun closeAccount(@PathVariable accountNumber: String): AccountEntity {
+        val account: AccountEntity? = accountRepo.findByAccountNumber(accountNumber)
+        return account?.let {
+            accountRepo.save(it.copy(isActive = false))
+        } ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found")
     }
 
     @GetMapping("/accounts/v1/accounts")
